@@ -4,7 +4,7 @@ from requests.auth import HTTPBasicAuth
 # Setup
 organization = 'cat-digital-applications'
 project = 'CRM' 
-pat = 'wjwvvkcbz72nnkam5uao6udcmabo6btzitdznitrgn3qj6xczjiq'
+pat = 'PAT'
 
 # Azure DevOps REST API endpoint for retrieving teams in a project
 url = f'https://dev.azure.com/{organization}/_apis/projects/{project}/teams?api-version=6.0'
