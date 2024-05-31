@@ -3,7 +3,7 @@ from msrest.authentication import BasicAuthentication
 import pprint
 
 # Fill in with your personal access token and org URL
-personal_access_token = 'wjwvvkcbz72nnkam5uao6udcmabo6btzitdznitrgn3qj6xczjiq'
+personal_access_token = 'PAT'
 organization_url = 'https://dev.azure.com/cat-digital-applications'
 
 # Create a connection to the org
