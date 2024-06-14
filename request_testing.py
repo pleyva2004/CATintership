@@ -123,8 +123,6 @@ def get_story_points(member_id):
 
 teams = get_teams()
 team_names = []
-
-
 for team in teams['value']:
       #print(team['name'])
       team_names.append(team['name'])
