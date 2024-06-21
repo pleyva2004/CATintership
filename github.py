@@ -6,7 +6,7 @@ import pandas as pd
 org = 'cat-digital-platform'
 repo_name = 'A-ECRM-Master'
 branch = 'ECRM_Devint'
-pat = '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'
+pat = 'pat'
 
 
 # Functino to get detailed information on Recent Commits
