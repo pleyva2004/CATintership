@@ -6,7 +6,7 @@ import pandas as pd
 org = 'cat-digital-platform'
 repo = 'A-ECRM-Master'
 branch = 'ECRM_Devint'
-pat = 'pat'
+pat = 'patg'
 
 
 # Functino to get detailed information on Recent Commits
@@ -94,6 +94,20 @@ def get_reviews(pull_number):
         return None
 
 
+def get_user_info(username):
+    url = f"https://api.github.com/users/{username}"
+    headers = {"Authorization": f"token {pat}"}
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        user_data = response.json()
+        full_name = user_data.get("name")
+        email = user_data.get("email")
+        return full_name, email
+    else:
+        print(f"Failed to fetch user info: {response.status_code}")
+
+
 def convert_iso_to_date(iso_string: str) -> str:
     date_obj = datetime.fromisoformat(iso_string)
 
@@ -110,7 +124,9 @@ commit_messages_list = []
 employee_name = []
 employee_email = []
 commit_date = []
-approved_users = []
+approved_users_id = []
+approved_users_name = []
+approved_users_email = []
 
 
 commits = get_recent_commits()
@@ -124,18 +140,29 @@ for commit in commits:
     date = convert_iso_to_date(commit['commit']['author']['date'])
     commit_date.append(date)
 
-    approved_users.append("")
+    approved_users_id.append('')
+    approved_users_name.append('')
+    approved_users_email.append('')
     commit_sha = commit['sha']
     # Find the pull request associated with the commit
     for pr in pull_requests:
         if pr["merge_commit_sha"] == commit_sha:
             reviews = get_reviews(pr["number"])
             if reviews:
-                print(f"Approvals for {commit_messages_list[-1]} :")
                 for review in reviews:
-                    print(review['user']['login'])
-                    approved_users.pop()
-                    approved_users.append(review['user']['login'])
+                    approved_users_id.pop()
+                    approved_users_id.append(review['user']['login'])
+
+                    # Get the Name and Email based on User Login
+                    name, email = get_user_info(review['user']['login'])
+
+                    approved_users_name.pop()
+                    approved_users_name.append(name)
+
+                    approved_users_email.pop()
+                    approved_users_email.append(email)
+
+
 
 
 
@@ -144,7 +171,9 @@ data = {
     "Employee Name": employee_name,
     "Employee Email": employee_email,
     "Date": commit_date,
-    "Reviewer Name" : approved_users
+    "Reviewer CAT ID": approved_users_id,
+    "Reviewer Name": approved_users_name,
+    "Reviewer Email": approved_users_email
 }
 
 df = pd.DataFrame(data)
