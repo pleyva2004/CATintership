@@ -6,7 +6,7 @@ import pandas as pd
 org = 'cat-digital-platform'
 repo = 'A-ECRM-Master'
 branch = 'ECRM_Devint'
-pat = 'patg'
+pat = 'pat'
 
 
 # Functino to get detailed information on Recent Commits
@@ -161,9 +161,6 @@ for commit in commits:
 
                     approved_users_email.pop()
                     approved_users_email.append(email)
-
-
-
 
 
 data = {
