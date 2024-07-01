@@ -401,3 +401,5 @@ venv/*
 .idea/*
 
 output.csv
+output_ado.csv
+temp.py

@@ -2,8 +2,6 @@ import requests
 from requests.auth import HTTPBasicAuth
 from datetime import datetime, timedelta
 import pandas as pd
-import json
-
 
 # Setup
 organization = 'cat-digital-applications'
@@ -59,7 +57,6 @@ def get_members(team_name, id_list):
                     if email not in email_list:
                         email_list.append(email)
 
-
                         # dev = (member_id, display_name, email)
                         # employee_list.add(dev)
 
@@ -72,13 +69,26 @@ def get_members(team_name, id_list):
         print(f"Failed to retrieve teams. Status code: {response.status_code}")
 
 
+# Function to convert from iso Date Time -> M/D/Y
+def convert_iso_to_date(iso_string: str) -> str:
+    date_obj = datetime.fromisoformat(iso_string)
+
+    # Desired format string
+    desired_format = "%m-%d-%Y"
+
+    # Convert datetime object to desired format
+    formatted_string = date_obj.strftime(desired_format)
+
+    return formatted_string
+
+
 # Function to get story points for work items assigned to a member
 def get_story_points(assigned_to):
     # Azure DevOps REST API endpoint for querying work items
     url = f'https://dev.azure.com/{organization}/{project}/_apis/wit/wiql?api-version=6.0'
 
     # Calculate the date one month ago
-    creation_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+    creation_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
 
     # WIQL query to find work items assigned to the member
     query = {
@@ -90,94 +100,110 @@ def get_story_points(assigned_to):
     }
 
     query3 = {
-         "query": f"SELECT [System.Id], [System.Title], [System.State] FROM WorkItems WHERE [System.TeamProject] = '{project}' AND [System.CreatedDate] >= '{creation_date}'"
+        "query": f"SELECT [System.Id], [System.Title], [System.State] FROM WorkItems WHERE [System.TeamProject] = '{project}' AND [System.CreatedDate] >= @Today - 3 "
+    }
+
+    query4 = {
+        "query": f"SELECT [System.Id], [System.WorkItemType], [System.Title], [System.AssignedTo], [System.c], [System.Tags], [System.AreaPath],[System.CreatedBy], [System.CreatedDate], [Microsoft.VSTS.Scheduling.StoryPoints], [System.IterationPath], [System.ExternalLinkCount]  FROM WorkItems WHERE [System.TeamProject] = '{project}' AND [System.CreatedDate] >= @Today - 7 "
+    }
+
+    query5 = {
+        "query": f"SELECT * FROM WorkItems WHERE [System.TeamProject] = '{project}' AND [System.WorkItemType] IN ('Bug', 'User Story') AND [System.State] IN ('12.Ready for UAT', '13.In UAT', '16.Ready to Deploy to Prod','17.Deployed to Prod', 'Closed') AND [System.ExternalLinkCount] == 0 AND [System.CreatedDate] >= @Today - 7 ORDER BY [System.CreatedDate] DESC"
     }
 
     # Making the POST request
-    response = requests.post(url, json=query2, auth=auth)
+    response = requests.post(url, json=query5, auth=auth)
 
     # Check if the request was successful
     if response.status_code == 200:
         query_result = response.json()
+
+        global work_item_ids
         # Get the work item IDs
         work_item_ids = [item['id'] for item in query_result['workItems']]
 
 
-
-
         for ids in work_item_ids:
 
+            # Get the work item details
             work_items_url = f'https://dev.azure.com/{organization}/_apis/wit/workitems?ids={ids}&api-version=6.0'
             work_items_response = requests.get(work_items_url, auth=HTTPBasicAuth('', pat))
 
             if work_items_response.status_code == 200:
                 work_items_details = work_items_response.json()
 
-                if 'relations' in work_items_details:
-                    print("Found")
-                break
-                # Print work items details for debugging purposes
-
                 # Print work items details
+
                 for item in work_items_details['value']:
-                    #print(f"Work Items Details: {json.dumps(work_items_details, indent=2)}")
-                    print(f"Work Item ID: {item['id']}")
-                    print(item.keys())
-                    #print(f"Title: {item['fields']['System.Title']}")
-                    #print(f"State: {item['fields']['System.State']}")
-                    #print(f"Type: {item['fields']['System.WorkItemType']}")
+                    keys = list(item['fields'].keys())
 
-                    has_external_link = False
-                    external_link = None
-                    if 'relations' in item:
-                        for relation in item['relations']:
-                            if relation['rel'] == 'ArtifactLink':
-                                has_external_link = True
-                                external_link = relation['url']
-                                break
+                    # print(f"Work Item ID: {item['id']}")
+                    # work_item_ids.append(item['id'])
+                    # print(f"Title: {item['fields']['System.Title']}")
+                    work_item_titles.append(item['fields']['System.Title'])
+                    # print(f"State: {item['fields']['System.State']}")
+                    work_item_states.append(item['fields']['System.State'])
+                    # print(f"Type: {item['fields']['System.WorkItemType']}")
+                    work_item_types.append(item['fields']['System.WorkItemType'])
 
-                    if has_external_link:
-                        print("External Link: Yes")
-                        print(f"Link: {external_link}")
+                    if 'System.AssignedTo' in keys:
+                        name = item['fields']['System.AssignedTo']['displayName']
+                        work_item_assignedTo_name.append(name)
+                        email = item['fields']['System.AssignedTo']['uniqueName']
+                        work_item_assignedTo_email.append(email)
+                        worker_id = item['fields']['System.AssignedTo']['id']
+                        # print(f"Assigned To: {name}, {email}, {worker_id}")
+
                     else:
-                        print("External Link: No")
+                        work_item_assignedTo_name.append('')
+                        work_item_assignedTo_email.append('')
+
+                    if 'System.Tags' in keys:
+                        work_item_tags.append(item['fields']['System.Tags'])
+                        # print(f"Tags: {item['fields']['System.Tags']}")
+                    else:
+                        work_item_tags.append('')
+
+                    if 'System.AreaPath' in keys:
+                        work_item_area_path.append(item['fields']['System.AreaPath'])
+                        # print(f"AreaPath: {item['fields']['System.AreaPath']}")
+                    else:
+                        work_item_area_path.append('')
+
+                    pm_name = item['fields']['System.CreatedBy']['displayName']
+                    work_item_creator_name.append(pm_name)
+                    pm_email = item['fields']['System.CreatedBy']['uniqueName']
+                    work_item_creator_email.append(pm_email)
+                    pm_id = item['fields']['System.CreatedBy']['id']
+                    # print(f"Created By: {pm_name}, {pm_email}, {pm_id}")
+
+                    created_date = convert_iso_to_date(item['fields']['System.CreatedDate'])
+                    work_item_created_date.append(created_date)
+                    # print(f"Created Date: {created_date}")
+
+                    if 'Microsoft.VSTS.Scheduling.StoryPoints' in keys:
+                        work_item_story_points.append(item['fields']['Microsoft.VSTS.Scheduling.StoryPoints'])
+                        # print(f"StoryPoints: {item['fields']['Microsoft.VSTS.Scheduling.StoryPoints']}")
+                    else:
+                        work_item_story_points.append('')
+
+                    if 'System.IterationPath' in keys:
+                        work_item_iteration_path.append(item['fields']['System.IterationPath'])
+                        # print(f"IterationPath: {item['fields']['System.IterationPath']}")
+                    else:
+                        work_item_iteration_path.append('')
+
+                    # if 'System.ExternalLinkCount' in keys:
+                    # print(f"ExternalLinkCount: {item['fields']['System.ExternalLinkCount']}")
+
             else:
                 print(f"Failed to get work items details: {work_items_response.status_code}")
                 print(work_items_response.text)
         else:
             print("No work items found.")
 
-
-        # Fetch the work items using their IDs
-        #work_items_url = f'https://dev.azure.com/{organization}/_apis/wit/workitems?ids={",".join(map(str, work_item_ids))}&api-version=6.0'
-
-        #work_items_response = requests.get(work_items_url, auth=auth)
-
-        #if work_items_response.status_code == 200:
-            #work_items = work_items_response.json()
-            #print(json.dumps(work_items, indent=4))
-        #else:
-            #print(f'Error fetching work items: {work_items_response.status_code}')
-        # print(work_items_response.json())
-
-        # for item in work_items.get('workItems', []):
-        #   item_id = item['id']
-        # Get detailed information about each work item
-        #  item_url = f'https://dev.azure.com/{organization}/{project}/_apis/wit/workitems/{item_id}?api-version=6.0'
-        # item_response = requests.get(item_url, auth=HTTPBasicAuth('', pat))
-
-        # if item_response.status_code == 200:
-        #   item_details = item_response.json()
-        #  story_point = item_details.get('fields', {}).get('Microsoft.VSTS.Scheduling.StoryPoints', 0)
-        # story_points[item_id] = story_point
-        # else:
-        #   print(f"Failed to retrieve work item {item_id}. Status code: {item_response.status_code}")
-        #  print(item_response.text)
-
-        # return story_points
     else:
         print(f"Failed to query work items. Status code: {response.status_code}")
-        # print(response.text)
         return {}
 
 
@@ -191,7 +217,6 @@ id_list = []
 name_list = []
 email_list = []
 
-
 for team in team_names:
     get_members(team, id_list)
 
@@ -201,4 +226,40 @@ employee_data = dict(zip(id_list, name_email_list))
 
 # print(employee_data[id_list[0]][1])
 
+
+work_item_ids = []
+work_item_titles = []
+work_item_states = []
+work_item_types = []
+work_item_assignedTo_name = []
+work_item_assignedTo_email = []
+work_item_tags = []
+work_item_area_path = []
+work_item_creator_name = []
+work_item_creator_email = []
+work_item_created_date = []
+work_item_story_points = []
+work_item_iteration_path = []
+
 get_story_points('arpitha.jh@cat.com')
+
+data = {
+    "Work Item ID": work_item_ids,
+    "Title": work_item_titles,
+    "State": work_item_states,
+    "Work Item Type": work_item_types,
+    "Assigned To Name": work_item_assignedTo_name,
+    "Assigned To Email": work_item_assignedTo_email,
+    "Tags": work_item_tags,
+    "Area Path": work_item_area_path,
+    "Creator Name": work_item_creator_name,
+    "Creator Email": work_item_creator_email,
+    "Created Date": work_item_created_date,
+    "Story Points": work_item_story_points,
+    "Iteration Path": work_item_iteration_path
+}
+
+df = pd.DataFrame(data)
+df.to_csv("output_ado.csv", index=False)
+
+print("Done.")
